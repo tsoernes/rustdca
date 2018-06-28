@@ -17,8 +17,8 @@ lazy_static! {
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Cell {
-    row: usize,
-    col: usize,
+    pub row: usize,
+    pub col: usize,
 }
 
 #[derive(PartialEq, Eq, Ord, PartialOrd)]
@@ -111,6 +111,14 @@ pub fn neighbors(
     let start = if include_self { 0 } else { 1 };
     let end = NEIGHS.3[[dist - 1, row, col]];
     allneighs.slice(s![row, col, start..end, ..])
+}
+
+pub fn cell_of(neighs: ArrayView<usize, Ix2>, i: usize) -> Cell {
+    let neigh = neighs.slice(s![i, ..]);
+    Cell {
+        row: neigh[[0]],
+        col: neigh[[1]],
+    }
 }
 
 /// Alloc. map of channels in use at cell neighbors with distance of 2 or less
