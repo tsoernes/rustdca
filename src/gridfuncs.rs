@@ -1,9 +1,5 @@
-#[macro_use]
-extern crate ndarray;
-#[macro_use]
-extern crate lazy_static;
-
 use ndarray::prelude::*;
+use std::fmt;
 use std::ops::AddAssign;
 use std::ops::BitOr;
 use std::ops::BitOrAssign;
@@ -19,21 +15,27 @@ lazy_static! {
                         Array<usize, Ix4>, Array<usize, Ix3>) = generate_neighs();
 }
 
+#[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Cell {
     row: usize,
     col: usize,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, Ord, PartialOrd)]
 pub enum CEType {
-    NEW,
-    END,
-    HOFF,
+    NEW = 0,
+    END = 1,
+    HOFF = 2,
 }
 
-struct CEvent {
-    ce_type: CEType,
-    cell: Cell,
+impl fmt::Display for CEType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CEType::NEW => write!(f, "NEW"),
+            CEType::END => write!(f, "END"),
+            CEType::HOFF => write!(f, "HOFF"),
+        }
+    }
 }
 
 type Grid = Array<bool, Ix3>;
@@ -92,7 +94,7 @@ fn generate_neighs() -> (
     (neighs1, neighs2, neighs4, n_neighs)
 }
 
-fn neighbors(
+pub fn neighbors(
     dist: usize,
     row: usize,
     col: usize,
@@ -234,5 +236,3 @@ pub fn incremental_freps(
     }
     freps
 }
-
-fn main() {}
