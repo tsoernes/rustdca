@@ -5,9 +5,9 @@ use std::ops::BitOr;
 use std::ops::BitOrAssign;
 use std::ops::Not;
 
-const ROWS: usize = 7;
-const COLS: usize = 7;
-const CHANNELS: usize = 70;
+pub const ROWS: usize = 7;
+pub const COLS: usize = 7;
+pub const CHANNELS: usize = 70;
 
 lazy_static! {
     // (NEIGHS1, NEIGHS2, NEIGHS4, N_NEIGHS):
@@ -15,32 +15,32 @@ lazy_static! {
                         Array<usize, Ix4>, Array<usize, Ix3>) = generate_neighs();
 }
 
-#[derive(Eq, PartialEq, Hash, Clone)]
+#[derive(Eq, PartialEq, Hash, Clone, Copy)]
 pub struct Cell {
     pub row: usize,
     pub col: usize,
 }
 
 #[derive(PartialEq, Eq, Ord, PartialOrd)]
-pub enum CEType {
+pub enum EType {
     NEW = 0,
     END = 1,
     HOFF = 2,
 }
 
-impl fmt::Display for CEType {
+impl fmt::Display for EType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            CEType::NEW => write!(f, "NEW"),
-            CEType::END => write!(f, "END"),
-            CEType::HOFF => write!(f, "HOFF"),
+            EType::NEW => write!(f, "NEW"),
+            EType::END => write!(f, "END"),
+            EType::HOFF => write!(f, "HOFF"),
         }
     }
 }
 
-type Grid = Array<bool, Ix3>;
+pub type Grid = Array<bool, Ix3>;
 type Grids = Array<bool, Ix4>;
-type Frep = Array<usize, Ix3>;
+pub type Frep = Array<usize, Ix3>;
 type Freps = Array<usize, Ix4>;
 
 /// Distance from cell (r1, c1) to cell (r2, c2) in a hexagonal grid
@@ -152,9 +152,9 @@ fn get_eligible_chs(grid: &Grid, cell: &Cell) -> Vec<usize> {
         .collect()
 }
 
-fn afterstates(grid: &Grid, cell: &Cell, ce_type: &CEType, chs: &[usize]) -> Grids {
+fn afterstates(grid: &Grid, cell: &Cell, ce_type: &EType, chs: &[usize]) -> Grids {
     let targ_val = match ce_type {
-        CEType::END => false,
+        EType::END => false,
         _ => true,
     };
     let mut grids: Grids = Array::default((chs.len(), 7, 7, 70));
@@ -203,7 +203,7 @@ pub fn incremental_freps(
     grid: &mut Grid,
     frep: &Frep,
     cell: &Cell,
-    ce_type: &CEType,
+    ce_type: &EType,
     chs: &[usize],
 ) -> Freps {
     let (r1, c1) = (cell.row, cell.col);
@@ -213,7 +213,7 @@ pub fn incremental_freps(
     freps.assign(&frep);
     let mut n_used_neighs_diff: isize = 1;
     let mut n_elig_self_diff: isize = -1;
-    if *ce_type == CEType::END {
+    if *ce_type == EType::END {
         n_used_neighs_diff = -1;
         n_elig_self_diff = 1;
     }
@@ -222,7 +222,7 @@ pub fn incremental_freps(
             freps[[i, neigh[0], neigh[1], *ch]] =
                 (freps[[i, neigh[0], neigh[1], *ch]] as isize + n_used_neighs_diff) as usize;
         }
-        if *ce_type == CEType::END {
+        if *ce_type == EType::END {
             grid[[r1, c1, *ch]] = false;
         }
         for neigh_a in neighs2.outer_iter() {
@@ -238,9 +238,13 @@ pub fn incremental_freps(
                         as usize;
             }
         }
-        if *ce_type == CEType::END {
+        if *ce_type == EType::END {
             grid[[r1, c1, *ch]] = true;
         }
     }
     freps
+}
+
+pub fn n_used(grid: &Grid) -> usize {
+    grid.fold(0, |n_used, &inuse| n_used + inuse as usize)
 }
