@@ -12,6 +12,7 @@ extern crate rand;
 extern crate revord;
 #[macro_use]
 extern crate structopt;
+extern crate chrono;
 
 use ordered_float::*;
 
