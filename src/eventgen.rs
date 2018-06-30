@@ -7,6 +7,24 @@ use revord::RevOrd;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::fmt;
+
+#[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
+pub enum EType {
+    NEW = 0,
+    END = 1,
+    HOFF = 2,
+}
+
+impl fmt::Display for EType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            EType::NEW => write!(f, "NEW"),
+            EType::END => write!(f, "END"),
+            EType::HOFF => write!(f, "HOFF"),
+        }
+    }
+}
 
 pub struct Event {
     pub id: u32,
@@ -47,6 +65,7 @@ impl PartialEq for EI {
 }
 impl Eq for EI {}
 
+#[derive(Default)]
 pub struct EventGen {
     // Current Event ID
     id: u32,
@@ -62,6 +81,11 @@ pub struct EventGen {
 }
 
 impl EventGen {
+    pub fn new() -> EventGen {
+        EventGen {
+            ..Default::default()
+        }
+    }
     pub fn push(&mut self, event: Event) {
         if event.etype == EType::END {
             let c = event.cell.clone();

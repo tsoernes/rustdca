@@ -1,5 +1,5 @@
+use eventgen::EType;
 use ndarray::prelude::*;
-use std::fmt;
 use std::ops::AddAssign;
 use std::ops::BitOr;
 use std::ops::BitOrAssign;
@@ -19,23 +19,6 @@ lazy_static! {
 pub struct Cell {
     pub row: usize,
     pub col: usize,
-}
-
-#[derive(PartialEq, Eq, Ord, PartialOrd)]
-pub enum EType {
-    NEW = 0,
-    END = 1,
-    HOFF = 2,
-}
-
-impl fmt::Display for EType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            EType::NEW => write!(f, "NEW"),
-            EType::END => write!(f, "END"),
-            EType::HOFF => write!(f, "HOFF"),
-        }
-    }
 }
 
 pub type Grid = Array<bool, Ix3>;

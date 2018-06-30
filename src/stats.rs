@@ -2,11 +2,10 @@ use chrono::Local;
 use eventgen::Event;
 
 #[derive(Default)]
-struct Stats {
+pub struct Stats {
     start_time: i64, // Start time (wall-clock)
     i: i32,          // Current iteration
     t: f32,          // Current event time
-    log_iter: i32,   // Log period length, in iterations
 
     // Number of call arrivals this log_iter period (not including hand-offs)
     n_curr_arrivals_new: i32,
@@ -48,13 +47,17 @@ impl Stats {
         self.n_arrivals_hoff += 1
     }
 
-    pub fn reject_new(&mut self) {
+    pub fn event_reject_new(&mut self) {
         self.n_rejected_new += 1;
         self.n_curr_rejected_new += 1
     }
 
-    pub fn reject_hoff(&mut self) {
+    pub fn event_reject_hoff(&mut self) {
         self.n_rejected_hoff += 1;
+    }
+
+    pub fn event_end(&mut self) {
+        self.n_ended += 1;
     }
 
     fn cums(&mut self) -> (f32, f32, f32) {
@@ -65,10 +68,7 @@ impl Stats {
         (cum_block_prob_new, cum_block_prob_hoff, cum_block_prob_tot)
     }
 
-    pub fn report_log_iter(&mut self, i: i32, event: Event) {
-        self.i = i;
-        self.t = event.time;
-
+    pub fn report_log_iter(&mut self, i: i32) {
         let (cum_block_prob_new, cum_block_prob_hoff, cum_block_prob_tot) = self.cums();
         self.cum_block_probs_new.push(cum_block_prob_new);
         self.cum_block_probs_hoff.push(cum_block_prob_hoff);
@@ -78,16 +78,19 @@ impl Stats {
         self.block_probs.push(block_prob);
         println!(
             "\nBlocking probability events {}-{}: {}, cumulative {}",
-            self.i - self.log_iter,
-            self.i,
+            i - self.i,
+            i,
             block_prob,
             cum_block_prob_new
         );
         self.n_curr_rejected_new = 0;
         self.n_curr_arrivals_new = 0;
+        self.i = i;
     }
 
-    pub fn report_end(&mut self, n_in_progress: i32) {
+    /// t: Simulation time
+    /// n_in_progress: Calls currently in progress at simulation end
+    pub fn report_end(&mut self, t: f32, n_in_progress: i32) {
         let delta = self.n_arrivals_new + self.n_arrivals_hoff
             - self.n_rejected_new
             - self.n_rejected_hoff
@@ -99,7 +102,7 @@ impl Stats {
         let rate = self.i as f64 / dt;
         println!(
             "\nSimulation duration: {} sim hours, {}m{}s real, {} events at {} events/second",
-            self.t / 60.0,
+            t / 60.0,
             self.i,
             m,
             h,

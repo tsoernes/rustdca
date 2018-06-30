@@ -1,8 +1,10 @@
+mod agent;
 mod environment;
 mod eventgen;
 mod gridfuncs;
 mod stats;
 
+extern crate ctrlc;
 #[macro_use]
 extern crate ndarray;
 #[macro_use]
@@ -13,8 +15,6 @@ extern crate revord;
 #[macro_use]
 extern crate structopt;
 extern crate chrono;
-
-use ordered_float::*;
 
 use structopt::StructOpt;
 
@@ -45,8 +45,12 @@ struct Opt {
     p_hoff: f64,
 
     /// Simulation duration
-    #[structopt(short = "n", long = "n_events", default_value = "470000")]
+    #[structopt(short = "i", long = "n_events", default_value = "470000")]
     n_events: i32,
+
+    /// Simulation duration
+    #[structopt(long = "log_iter", default_value = "25000")]
+    log_iter: i32,
 
     /// Learning rate 2.52e-6
     #[structopt(short = "lr", long = "alpha", default_value = "2.52e-6")]
