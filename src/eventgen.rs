@@ -9,7 +9,7 @@ use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Clone)]
 pub enum EType {
     NEW = 0,
     END = 1,
@@ -26,6 +26,7 @@ impl fmt::Display for EType {
     }
 }
 
+#[derive(Clone)]
 pub struct Event {
     pub id: u32,
     pub time: f32,
@@ -67,17 +68,14 @@ impl Eq for EI {}
 
 #[derive(Default)]
 pub struct EventGen {
-    // Current Event ID
-    id: u32,
-    call_intertime: f32,
-    call_dur: f32,
-    hoff_call_dur: f32,
-    // Min-heap of event-identifiers sorted on event times
-    event_pq: BinaryHeap<EI>,
-    // Mapping from event IDs to event structs
-    events: HashMap<u32, Event>,
-    // Mapping from cell-channel pairs to end event IDs
-    end_ids: HashMap<(usize, usize, usize), u32>,
+    // TODO perhaps IDs can be replaced by references? idk. not that important
+    id: u32,                                      // Current Event ID
+    call_intertime: f32,                          // Average time between call arrivals
+    call_dur: f32,                                // Average call duration
+    hoff_call_dur: f32,                           // Average hand-off call duration
+    event_pq: BinaryHeap<EI>, // Min-heap of event-identifiers sorted on event times
+    events: HashMap<u32, Event>, // Mapping from event IDs to event structs
+    end_ids: HashMap<(usize, usize, usize), u32>, // Mapping from cell-channel pairs to end event IDs
 }
 
 impl EventGen {
@@ -157,14 +155,9 @@ impl EventGen {
     /// The hand-off from 'cell' is deconstructed into two parts: the departure from 'cell',
     /// and the subsequent arrival in 'neigh'. These two events have the same time stamp, though
     /// since the ID of the arrival is larger it will be handled last.
-    pub fn event_hoff_new(
-        &mut self,
-        t: f32,
-        cell: Cell,
-        ch: usize,
-        neighs: ArrayView<'static, usize, Ix2>,
-    ) {
+    pub fn event_hoff_new(&mut self, t: f32, cell: Cell, ch: usize) {
         let end_t = self.event_end(t, cell, ch);
+        let neighs = neighbors(1, cell.row, cell.col, false);
         let neigh_i: usize = Uniform::from(0..neighs.len()).sample(&mut thread_rng());
         self.id += 1;
         let new_event = Event {

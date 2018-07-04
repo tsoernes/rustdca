@@ -5,16 +5,16 @@ use rand::{thread_rng, Rng};
 use stats::Stats;
 
 pub struct Env {
-    p_handoff: f64,
+    p_handoff: f32,
     verify_grid: bool,
     pub grid: Grid,
     pub stats: Stats,
     eventgen: EventGen,
-    // pub event: Event, // Current event to be processed
 }
 
 impl Env {
-    pub fn new(p_handoff: f64, verify_grid: bool) -> (Env, Event) {
+    /// Initialize an environment and return the first event to be processed
+    pub fn new(p_handoff: f32, verify_grid: bool) -> (Env, Event) {
         let grid: Array3<bool> = Array::default((ROWS, COLS, CHANNELS));
         let mut eventgen = EventGen::new();
         for r in 0..ROWS {
@@ -30,7 +30,6 @@ impl Env {
                 grid: grid,
                 stats: Stats::new(),
                 eventgen: eventgen,
-                // event: event,
             },
             event,
         )
@@ -45,14 +44,9 @@ impl Env {
                 self.eventgen.event_new(time, cell);
                 match ch {
                     Some(ch) => {
-                        let p = thread_rng().gen::<f64>();
+                        let p = thread_rng().gen::<f32>();
                         if p < self.p_handoff {
-                            self.eventgen.event_hoff_new(
-                                time,
-                                cell,
-                                ch,
-                                neighbors(1, cell.row, cell.col, false),
-                            );
+                            self.eventgen.event_hoff_new(time, cell, ch);
                         } else {
                             self.eventgen.event_end(time, cell, ch);
                         }

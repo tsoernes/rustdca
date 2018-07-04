@@ -1,5 +1,4 @@
 use chrono::Local;
-use eventgen::Event;
 
 #[derive(Default)]
 pub struct Stats {
@@ -90,12 +89,12 @@ impl Stats {
 
     /// t: Simulation time
     /// n_in_progress: Calls currently in progress at simulation end
-    pub fn report_end(&mut self, t: f32, n_in_progress: i32) {
+    pub fn report_end(&mut self, t: f32, n_in_progress: usize) {
         let delta = self.n_arrivals_new + self.n_arrivals_hoff
             - self.n_rejected_new
             - self.n_rejected_hoff
             - self.n_ended;
-        assert_eq!(delta, n_in_progress);
+        assert_eq!(delta, n_in_progress as i32);
         let dt = (Local::now().timestamp() - self.start_time) as f64;
         let m = dt / 60.0;
         let h = dt - m * 60.0;

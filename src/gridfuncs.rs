@@ -9,6 +9,9 @@ pub const ROWS: usize = 7;
 pub const COLS: usize = 7;
 pub const CHANNELS: usize = 70;
 
+// TODO NOTE
+// Consider doing all ops on freps as usize and casting to f32 at end only
+
 lazy_static! {
     // (NEIGHS1, NEIGHS2, NEIGHS4, N_NEIGHS):
     static ref NEIGHS: (Array<usize, Ix4>, Array<usize, Ix4>,
@@ -23,8 +26,8 @@ pub struct Cell {
 
 pub type Grid = Array<bool, Ix3>;
 type Grids = Array<bool, Ix4>;
-pub type Frep = Array<usize, Ix3>;
-type Freps = Array<usize, Ix4>;
+pub type Frep = Array<f32, Ix3>;
+pub type Freps = Array<f32, Ix4>;
 
 /// Distance from cell (r1, c1) to cell (r2, c2) in a hexagonal grid
 fn hex_distance(r1: i8, c1: i8, r2: i8, c2: i8) -> i8 {
@@ -128,15 +131,34 @@ fn nonzero1(array: &Array<bool, Ix1>) -> Vec<usize> {
         .collect()
 }
 
-fn get_eligible_chs(grid: &Grid, cell: &Cell) -> Vec<usize> {
+pub fn get_inuse_chs(grid: &Grid, cell: &Cell) -> Vec<usize> {
+    grid.slice(s![cell.row, cell.col, ..])
+        .indexed_iter()
+        .filter_map(|(index, &item)| if item { Some(index) } else { None })
+        .collect()
+}
+
+pub fn get_eligible_chs(grid: &Grid, cell: &Cell) -> Vec<usize> {
     eligible_map(grid, cell)
         .indexed_iter()
         .filter_map(|(index, &item)| if item { Some(index) } else { None })
         .collect()
 }
 
-fn afterstates(grid: &Grid, cell: &Cell, ce_type: &EType, chs: &[usize]) -> Grids {
-    let targ_val = match ce_type {
+/// Return Some(argmax, max) of a 1D array; None if its empty
+pub fn argpmax1<N: PartialOrd + Copy>(arr: &Array1<N>) -> Option<(usize, N)> {
+    arr.indexed_iter().fold(None, |acc, (idx, &elem)| {
+        let (acc_idx, acc_elem) = acc.unwrap();
+        if &elem > &acc_elem {
+            Some((idx, elem))
+        } else {
+            Some((acc_idx, acc_elem))
+        }
+    })
+}
+
+fn afterstates(grid: &Grid, cell: &Cell, etype: &EType, chs: &[usize]) -> Grids {
+    let targ_val = match etype {
         EType::END => false,
         _ => true,
     };
@@ -165,11 +187,11 @@ pub fn validate_reuse_constraint(grid: &Grid) -> bool {
 pub fn feature_rep(grid: &Grid) -> Frep {
     let mut frep = Array::zeros((ROWS, COLS, CHANNELS + 1));
     // Probably inefficient
-    let g = grid.mapv(|x: bool| x as usize);
+    let g = grid.mapv(|x: bool| x as usize as f32);
     for r in 0..ROWS {
         for c in 0..COLS {
             let neighs = neighbors(4, r, c, false);
-            let mut n_used: Array1<usize> = Array::zeros(CHANNELS);
+            let mut n_used: Array1<f32> = Array::zeros(CHANNELS);
             for neigh in neighs.outer_iter() {
                 n_used.add_assign(&g.slice(s![neigh[0], neigh[1], ..]));
             }
@@ -181,12 +203,13 @@ pub fn feature_rep(grid: &Grid) -> Frep {
 
 /// Given a grid, its feature representation frep,
 /// and a set of actions specified by cell, event type and a list of channels,
-/// derive feature representations for the afterstates of grid
+/// derive feature representations for the afterstates of grid.
+/// The grid is only temporarily modified.
 pub fn incremental_freps(
     grid: &mut Grid,
     frep: &Frep,
     cell: &Cell,
-    ce_type: &EType,
+    etype: &EType,
     chs: &[usize],
 ) -> Freps {
     let (r1, c1) = (cell.row, cell.col);
@@ -196,16 +219,17 @@ pub fn incremental_freps(
     freps.assign(&frep);
     let mut n_used_neighs_diff: isize = 1;
     let mut n_elig_self_diff: isize = -1;
-    if *ce_type == EType::END {
+    if *etype == EType::END {
         n_used_neighs_diff = -1;
         n_elig_self_diff = 1;
     }
     for (i, ch) in chs.into_iter().enumerate() {
         for neigh in neighs4.outer_iter() {
             freps[[i, neigh[0], neigh[1], *ch]] =
-                (freps[[i, neigh[0], neigh[1], *ch]] as isize + n_used_neighs_diff) as usize;
+                // (freps[[i, neigh[0], neigh[1], *ch]] as isize + n_used_neighs_diff) as usize;
+                freps[[i, neigh[0], neigh[1], *ch]] as f32 + n_used_neighs_diff as f32;
         }
-        if *ce_type == EType::END {
+        if *etype == EType::END {
             grid[[r1, c1, *ch]] = false;
         }
         for neigh_a in neighs2.outer_iter() {
@@ -217,11 +241,10 @@ pub fn incremental_freps(
             }
             if !not_eligible {
                 freps[[i, neigh_a[0], neigh_a[1], CHANNELS]] =
-                    (freps[[i, neigh_a[0], neigh_a[1], CHANNELS]] as isize + n_elig_self_diff)
-                        as usize;
+                    freps[[i, neigh_a[0], neigh_a[1], CHANNELS]] as f32 + n_elig_self_diff as f32;
             }
         }
-        if *ce_type == EType::END {
+        if *etype == EType::END {
             grid[[r1, c1, *ch]] = true;
         }
     }
