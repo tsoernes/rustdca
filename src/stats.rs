@@ -4,12 +4,13 @@ use chrono::Local;
 pub struct Stats {
     start_time: i64, // Start time (wall-clock)
     i: i32,          // Current iteration
-    t: f32,          // Current event time
 
     // Number of call arrivals this log_iter period (not including hand-offs)
     n_curr_arrivals_new: i32,
     // Number of call arrivals (not including hand-offs)
     n_arrivals_new: i32,
+    // Number of accepted call arrivals (not including hand-offs)
+    n_accepted_new: i32,
     // Number of hand-offs arrival
     n_arrivals_hoff: i32,
     // Number of ended calls (including handed-off calls)
@@ -46,6 +47,10 @@ impl Stats {
         self.n_arrivals_hoff += 1
     }
 
+    pub fn event_accept_new(&mut self) {
+        self.n_accepted_new += 1
+    }
+
     pub fn event_reject_new(&mut self) {
         self.n_rejected_new += 1;
         self.n_curr_rejected_new += 1
@@ -76,11 +81,8 @@ impl Stats {
         let block_prob = self.n_curr_rejected_new as f32 / (self.n_curr_arrivals_new as f32 + 1.0);
         self.block_probs.push(block_prob);
         println!(
-            "\nBlocking probability events {}-{}: {}, cumulative {}",
-            i - self.i,
-            i,
-            block_prob,
-            cum_block_prob_new
+            "\nBlocking probability events {}-{}: {:.4}, cumulative {:.4}",
+            self.i, i, block_prob, cum_block_prob_new
         );
         self.n_curr_rejected_new = 0;
         self.n_curr_arrivals_new = 0;
@@ -100,19 +102,41 @@ impl Stats {
         let h = dt - m * 60.0;
         let rate = self.i as f64 / dt;
         println!(
-            "\nSimulation duration: {} sim hours, {}m{}s real, {} events at {} events/second",
+            "\nSimulation duration: {:.2} sim hours, {}m{}s real, {} events at {:.0} events/second",
             t / 60.0,
-            self.i,
             m,
             h,
+            self.i,
             rate
         );
 
+        debug!(
+            "n_curr_arrivals_new: {},
+             n_arrivals_new: {},
+             n_accepted_new: {},
+             n_arrivals_hoff: {},
+             n_ended: {},
+             n_curr_rejected_new: {},
+             n_rejected_new: {},
+             n_rejected_hoff: {}",
+            self.n_curr_arrivals_new,
+            self.n_arrivals_new,
+            self.n_accepted_new,
+            self.n_arrivals_hoff,
+            self.n_ended,
+            self.n_curr_rejected_new,
+            self.n_rejected_new,
+            self.n_rejected_hoff
+        );
+
         let (cum_block_prob_new, cum_block_prob_hoff, cum_block_prob_tot) = self.cums();
-        println!("Blocking probability: {} for new calls", cum_block_prob_new);
+        println!(
+            "Blocking probability: {:.4} for new calls",
+            cum_block_prob_new
+        );
         if self.n_rejected_hoff > 0 {
             print!(
-                ", {} for hand-offs, {} total",
+                ", {:.4} for hand-offs, {:.4} total",
                 cum_block_prob_hoff, cum_block_prob_tot
             );
         }

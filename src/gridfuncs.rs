@@ -1,6 +1,7 @@
 use eventgen::EType;
 use ndarray::prelude::*;
 use std::ops::AddAssign;
+use std::ops::BitAnd;
 use std::ops::BitOr;
 use std::ops::BitOrAssign;
 use std::ops::Not;
@@ -18,7 +19,7 @@ lazy_static! {
                         Array<usize, Ix4>, Array<usize, Ix3>) = generate_neighs();
 }
 
-#[derive(Eq, PartialEq, Hash, Clone, Copy)]
+#[derive(Eq, PartialEq, Hash, Clone, Copy, Debug)]
 pub struct Cell {
     pub row: usize,
     pub col: usize,
@@ -88,14 +89,14 @@ pub fn neighbors(
 ) -> ArrayView<'static, usize, Ix2> {
     // [[row1, row2, .., rowN], [col1, col2, .., colN]] for N neighbors
     let j = &NEIGHS;
-    let allneighs = match dist {
-        1 => &j.0,
-        2 => &j.1,
-        4 => &j.2,
+    let (allneighs, d) = match dist {
+        1 => (&j.0, 0),
+        2 => (&j.1, 1),
+        4 => (&j.2, 2),
         _ => panic!("Neighbors for distances other than 1, 2 or 4 should never be needed"),
     };
     let start = if include_self { 0 } else { 1 };
-    let end = NEIGHS.3[[dist - 1, row, col]];
+    let end = NEIGHS.3[[d, row, col]];
     allneighs.slice(s![row, col, start..end, ..])
 }
 
@@ -147,14 +148,11 @@ pub fn get_eligible_chs(grid: &Grid, cell: &Cell) -> Vec<usize> {
 
 /// Return Some(argmax, max) of a 1D array; None if its empty
 pub fn argpmax1<N: PartialOrd + Copy>(arr: &Array1<N>) -> Option<(usize, N)> {
-    arr.indexed_iter().fold(None, |acc, (idx, &elem)| {
-        let (acc_idx, acc_elem) = acc.unwrap();
-        if &elem > &acc_elem {
-            Some((idx, elem))
-        } else {
-            Some((acc_idx, acc_elem))
-        }
-    })
+    arr.indexed_iter()
+        .fold(None, |acc, (idx, &elem)| match acc {
+            Some((acc_idx, acc_elem)) if &acc_elem > &elem => Some((acc_idx, acc_elem)),
+            _ => Some((idx, elem)),
+        })
 }
 
 fn afterstates(grid: &Grid, cell: &Cell, etype: &EType, chs: &[usize]) -> Grids {
@@ -170,12 +168,13 @@ fn afterstates(grid: &Grid, cell: &Cell, etype: &EType, chs: &[usize]) -> Grids 
     grids
 }
 
-/// Returns false if reuse constraint is violated
+/// Returns false if the reuse constraint is violated
 pub fn validate_reuse_constraint(grid: &Grid) -> bool {
     for r in 0..ROWS {
         for c in 0..COLS {
             let cell = Cell { row: r, col: c };
-            let inuse = inuse_neighs(grid, &cell).bitor(&grid.slice(s![cell.row, cell.col, ..]));
+            // Channels in use at neighbor AND cell
+            let inuse = inuse_neighs(grid, &cell).bitand(&grid.slice(s![cell.row, cell.col, ..]));
             if inuse.into_iter().any(|&x| x) {
                 return false;
             }

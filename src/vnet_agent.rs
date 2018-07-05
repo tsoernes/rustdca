@@ -1,23 +1,20 @@
 use agent::*;
 use eventgen::EType;
 use gridfuncs::{
-    argpmax1, get_eligible_chs, get_inuse_chs, incremental_freps, Frep, Freps, CHANNELS, COLS, ROWS,
+    argpmax1, get_eligible_chs, get_inuse_chs, incremental_freps, Frep, CHANNELS, COLS, ROWS,
 };
-use ndarray::{
-    Array, Array1, Array2, Array3, ArrayView, ArrayView2, ArrayView3, Axis, Dim, Dimension,
-};
+use ndarray::{Array, Array1, Array2, ArrayView2, Axis, Dimension};
 use std::ops::AddAssign;
 use std::ops::SubAssign;
 
-const WDIM: usize = ROWS * COLS * CHANNELS + 1;
+const WDIM: usize = ROWS * COLS * (CHANNELS + 1);
+
 pub trait Net {
     fn forward<D: Dimension>(&mut self, freps: &Array<f32, D>) -> Array1<f32>;
-    // fn forward(&mut self, freps: &Freps) -> Array1<f32>;
-
     fn backward(&mut self, frep: &Frep, reward: f32, avg_reward: f32, next_frep: &Frep) -> f32;
 }
 
-struct VNet {
+pub struct VNet {
     alpha: f32,
     alpha_grad: f32,
     grad_corr: Array2<f32>, // w_t
@@ -45,43 +42,46 @@ impl Net for VNet {
         } else {
             freps.len_of(Axis(0))
         };
+        // println!("Reshape {:?} -> {:?}", freps.shape(), (n_freps, WDIM));
         let inp_rv: ArrayView2<f32> = freps
             .view()
             .into_shape((n_freps, WDIM))
             .expect("Frep reshape");
         inp_rv
             .dot(&self.weights)
-            .into_shape(WDIM)
+            .into_shape(n_freps)
             .expect("Frep reshape2")
     }
 
+    /// Backward pass.
     fn backward(&mut self, frep: &Frep, reward: f32, avg_reward: f32, next_frep: &Frep) -> f32 {
         let value = self.forward(frep);
-        assert_eq!(value.shape(), &[1, 1]);
+        assert_eq!(value.shape(), &[1]);
         let value = value[[0]];
         let next_value = self.forward(next_frep)[[0]];
         let td_err = reward - avg_reward + next_value - value;
-        let inp_rv: ArrayView2<f32> = frep.view().into_shape((1, WDIM)).expect("Frep reshape");
-        let inp_cv: ArrayView2<f32> = inp_rv.t();
+        let inp_rv: ArrayView2<f32> = frep.view().into_shape((1, WDIM)).expect("Frep reshape3");
+        let inp_cv = inp_rv.t();
         let next_inp_cv: ArrayView2<f32> = next_frep
             .view()
             .into_shape((WDIM, 1))
-            .expect("Frep reshape");
+            .expect("Frep reshape4");
         let dot = inp_rv.dot(&self.grad_corr);
         assert_eq!(dot.shape(), &[1, 1]);
         let dot = dot[[0, 0]];
         let c = 2.0 * self.alpha;
-        let mut grads: Array2<f32> = (c * td_err) * inp_cv.to_owned() - c * avg_reward;
-        grads.add_assign(&((c * dot) * next_inp_cv));
+        let grads: Array2<f32> =
+            (c * td_err) * inp_cv.to_owned() - c * avg_reward + (c * dot) * next_inp_cv.to_owned();
         assert_eq!(grads.shape(), self.weights.shape());
         self.weights.sub_assign(&grads);
-        let upd = (td_err - dot) * inp_cv;
+        let upd = (self.alpha_grad * (td_err - dot)) * inp_cv.to_owned();
+        assert_eq!(upd.shape(), self.grad_corr.shape());
         self.grad_corr.add_assign(&upd);
         td_err
     }
 }
 
-struct AAVNet<N: Net> {
+pub struct AAVNet<N: Net> {
     alpha_avg: f32,
     net: N,
     avg_reward: f32,
@@ -114,15 +114,19 @@ impl Agent for AAVNet<VNet> {
             EType::END => get_inuse_chs(&state.grid, &state.event.cell),
             _ => get_eligible_chs(&state.grid, &state.event.cell),
         };
+        debug!("Available actions for {:?}: {:?}", state.event, chs);
         if chs.is_empty() {
-            if state.event.etype == EType::END {
-                panic!("No channels in use for end event!");
-            }
+            assert_ne!(
+                state.event.etype,
+                EType::END,
+                "No channels in use for end event!"
+            );
             return None;
         }
         // TODO HLA
         let qvals = self.get_qvals(state, &chs);
         let (idx, _qval) = argpmax1(&qvals).unwrap();
+        debug!("qvals: {:?}, idx: {:?}, ch: {}", qvals, idx, chs[idx]);
         Some(chs[idx])
     }
 
@@ -133,6 +137,7 @@ impl Agent for AAVNet<VNet> {
             self.avg_reward,
             &next_state.frep,
         );
+        assert!(!err.is_nan(), "NaN loss");
         self.avg_reward += self.alpha_avg * err;
     }
 }

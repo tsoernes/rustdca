@@ -22,7 +22,7 @@ pub trait Agent {
 
 /// (x_t, e_t) -> a_t -> r_{t+1} -> (x_{t+1}, e_{t+1})
 // fn simulate(opt: Opt) -> (f32, f32) {
-pub fn simulate<A: Agent>(opt: Opt) {
+pub fn simulate<A: Agent>(opt: &Opt) {
     // Create CTRL-C key handler
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
@@ -30,9 +30,7 @@ pub fn simulate<A: Agent>(opt: Opt) {
         r.store(false, Ordering::SeqCst);
     }).expect("Error setting Ctrl-C handler");
 
-    let (mut env, event) = Env::new(opt.p_hoff, opt.verify_grid);
-
-    let t: f32 = 0.0; // Simulation time
+    let (mut env, event) = Env::new(opt);
     let mut agent: A = A::new(opt.alpha, opt.alpha_avg, opt.alpha_grad);
 
     let mut state = State {
@@ -44,7 +42,8 @@ pub fn simulate<A: Agent>(opt: Opt) {
     let mut next_state;
     for i in 0..opt.n_events {
         if !running.load(Ordering::SeqCst) {
-            println!("Got CTRL-C");
+            println!("Premature exit");
+            break;
         }
         let (reward, next_event) = env.step(state.event.clone(), action);
         next_state = State {
@@ -54,8 +53,6 @@ pub fn simulate<A: Agent>(opt: Opt) {
             event: next_event,
         };
         agent.update(&state, action, reward as i32, &next_state);
-        drop(state);
-        drop(action);
         action = agent.get_action(&mut next_state);
 
         if i > 0 && i % opt.log_iter == 0 {
@@ -63,5 +60,5 @@ pub fn simulate<A: Agent>(opt: Opt) {
         }
         state = next_state;
     }
-    env.stats.report_end(t, n_used(&env.grid));
+    env.stats.report_end(state.event.time, n_used(&env.grid));
 }

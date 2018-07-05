@@ -1,5 +1,5 @@
+use super::Opt;
 use gridfuncs::*;
-use ndarray::prelude::*;
 use ordered_float::*;
 use rand::distributions::{Distribution, Exp, Uniform};
 use rand::thread_rng;
@@ -9,7 +9,7 @@ use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(PartialEq, Eq, Ord, PartialOrd, Clone)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Debug)]
 pub enum EType {
     NEW = 0,
     END = 1,
@@ -26,7 +26,7 @@ impl fmt::Display for EType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Event {
     pub id: u32,
     pub time: f32,
@@ -35,7 +35,7 @@ pub struct Event {
     pub ch: Option<usize>,
 }
 
-// Event identifiers
+/// Event identifiers
 struct EI {
     // floats must be wrapped in NotNaN to support ordering (impl Ord)
     // NotNaNs must be wrapped in RevOrd which reveres ordering since BinaryHeap sorts by max
@@ -79,12 +79,22 @@ pub struct EventGen {
 }
 
 impl EventGen {
-    pub fn new() -> EventGen {
+    pub fn new(opt: &Opt) -> EventGen {
+        let call_intertime = opt.call_rate_ph / 60.0;
+        debug!(
+            "Call intertime: {}, call duration: {}",
+            call_intertime, opt.call_dur
+        );
         EventGen {
+            call_intertime: call_intertime,
+            call_dur: 1.0 / opt.call_dur,
+            hoff_call_dur: 1.0 / opt.hoff_call_dur,
             ..Default::default()
         }
     }
+
     pub fn push(&mut self, event: Event) {
+        debug!("Pushed event: {:?}", event);
         if event.etype == EType::END {
             let c = event.cell.clone();
             self.end_ids.insert(
@@ -139,7 +149,7 @@ impl EventGen {
     }
 
     pub fn event_new(&mut self, t: f32, cell: Cell) {
-        let dt: f32 = Exp::new(self.call_intertime.into()).sample(&mut thread_rng()) as f32;
+        let dt = Exp::new(self.call_intertime.into()).sample(&mut thread_rng()) as f32;
         self.id += 1;
         let event = Event {
             id: self.id,
@@ -170,7 +180,8 @@ impl EventGen {
         self.push(new_event)
     }
 
-    fn _event_end(&mut self, t: f32, dt: f32, cell: Cell, ch: usize) -> f32 {
+    fn _event_end(&mut self, t: f32, dur: f64, cell: Cell, ch: usize) -> f32 {
+        let dt = Exp::new(dur).sample(&mut thread_rng()) as f32;
         self.id += 1;
         let event = Event {
             id: self.id,
@@ -184,12 +195,12 @@ impl EventGen {
     }
 
     pub fn event_end(&mut self, t: f32, cell: Cell, ch: usize) -> f32 {
-        let dt: f32 = Exp::new(self.call_dur.into()).sample(&mut thread_rng()) as f32;
-        self._event_end(t, dt, cell, ch)
+        let dur = self.call_dur.into();
+        self._event_end(t, dur, cell, ch)
     }
 
     pub fn event_hoff_end(&mut self, t: f32, cell: Cell, ch: usize) -> f32 {
-        let dt: f32 = Exp::new(self.hoff_call_dur.into()).sample(&mut thread_rng()) as f32;
-        self._event_end(t, dt, cell, ch)
+        let dur = self.hoff_call_dur.into();
+        self._event_end(t, dur, cell, ch)
     }
 }
