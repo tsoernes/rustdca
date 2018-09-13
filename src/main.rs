@@ -18,6 +18,8 @@ extern crate structopt;
 extern crate chrono;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate itertools;
 extern crate simplelog;
 
 use agent::simulate;
@@ -41,7 +43,7 @@ use vnet_agent::VNet;
 #[structopt(name = "DCA")]
 pub struct Opt {
     /// Call duration, in minutes
-    #[structopt(short = "d", long = "call_dur", default_value = "3")]
+    #[structopt(long = "call_dur", default_value = "3")]
     call_dur: f32,
 
     /// Call duration for hand-offs, in minutes
@@ -57,30 +59,30 @@ pub struct Opt {
     p_hoff: f32,
 
     /// Simulation duration
-    #[structopt(short = "i", long = "n_events", default_value = "470000")]
+    #[structopt(short = "i", long = "n_events", default_value = "10000")]
     n_events: i32,
 
     /// Show blocking probability every 'log_iter' iterations
     #[structopt(long = "log_iter", default_value = "5000")]
     log_iter: i32,
 
-    /// Learning rate 2.52e-6
-    #[structopt(short = "lr", long = "alpha", default_value = "2.52e-6")]
+    /// Learning rate
+    #[structopt(short = "l", long = "alpha", default_value = "2.52e-6")]
     alpha: f32,
 
     /// Learning rate for average reward
-    // #[structopt(short = "alr", long = "alpha_avg", default_value = "4.75e-5")]
-    #[structopt(short = "alr", long = "alpha_avg", default_value = "0.06")]
+    #[structopt(short = "a", long = "alpha_avg", default_value = "0.06")]
     alpha_avg: f32,
 
     /// Learning rate for TDC gradient corrections
-    #[structopt(short = "glr", long = "alpha_grad", default_value = "5e-6")]
+    #[structopt(short = "g", long = "alpha_grad", default_value = "5e-6")]
     alpha_grad: f32,
 
     /// Verify channel reuse constraint each iteration
     #[structopt(long = "verify_grid")]
     verify_grid: bool,
 
+    /// Log level: '-v' for debug, '-vv' for trace
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: u8,
 }
@@ -92,19 +94,21 @@ fn main() {
     let llevel = match opt.verbose {
         0 => LevelFilter::Info,
         1 => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
+        2 => LevelFilter::Trace,
+        _ => {
+            println!("Only '-v' and '-vv' is valid. Using '-vv'.");
+            LevelFilter::Trace
+        }
     };
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            llevel,
-            Config {
-                time: Some(Level::Trace),
-                level: Some(Level::Trace),
-                target: Some(Level::Trace),
-                ..Default::default()
-            },
-        ).unwrap(),
-    ]).unwrap();
+    TermLogger::init(
+        llevel,
+        Config {
+            time: Some(Level::Trace),
+            level: Some(Level::Trace),
+            target: Some(Level::Trace),
+            ..Default::default()
+        },
+    ).unwrap();
 
     simulate::<AAVNet<VNet>>(&opt);
 }

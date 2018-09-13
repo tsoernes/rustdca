@@ -9,7 +9,7 @@ use stats::Stats;
 pub struct Env {
     p_handoff: f32,
     verify_grid: bool,
-    pub grid: Grid,
+    pub grid: GridO,
     pub stats: Stats,
     eventgen: EventGen,
 }
@@ -38,12 +38,12 @@ impl Env {
     }
 
     pub fn step(&mut self, event: Event, action: Action) -> (usize, Event) {
-        let (time, cell) = (event.time, event.cell);
+        let (time, cell) = (event.time, event.cell.clone());
         debug!("Time: {}, etype: {}, ch: {:?}", time, event.etype, action);
         match event.etype {
             EType::NEW => {
                 self.stats.event_arrival_new();
-                self.eventgen.event_new(time, cell);
+                self.eventgen.event_new(time, cell.clone());
                 match action {
                     Some(ch) => {
                         self.stats.event_accept_new();
@@ -77,7 +77,7 @@ impl Env {
         }
         action.map(|ch| self.execute_action(event, ch));
         if self.verify_grid {
-            assert!(validate_reuse_constraint(&self.grid));
+            assert!(validate_reuse_constraint(&self.grid).is_ok());
         }
         let reward = n_used(&self.grid);
         debug!("Reward: {}", reward);

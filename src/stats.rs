@@ -23,12 +23,12 @@ pub struct Stats {
     n_rejected_hoff: i32,
 
     // Block prob during each log iter period
-    block_probs: Vec<f32>,
+    block_probs: Vec<f64>,
     // For each log_iter,
     // cumulative new/hand-off/total call blocking probability thus far
-    cum_block_probs_new: Vec<f32>,
-    cum_block_probs_hoff: Vec<f32>,
-    cum_block_probs_tot: Vec<f32>,
+    cum_block_probs_new: Vec<f64>,
+    cum_block_probs_hoff: Vec<f64>,
+    cum_block_probs_tot: Vec<f64>,
 }
 
 impl Stats {
@@ -64,11 +64,11 @@ impl Stats {
         self.n_ended += 1;
     }
 
-    fn cums(&mut self) -> (f32, f32, f32) {
-        let cum_block_prob_new = self.n_rejected_new as f32 / (self.n_arrivals_new as f32 + 1.0);
-        let cum_block_prob_hoff = self.n_rejected_hoff as f32 / (self.n_arrivals_hoff as f32 + 1.0);
-        let cum_block_prob_tot = (self.n_rejected_new + self.n_rejected_hoff) as f32
-            / (self.n_arrivals_new + self.n_arrivals_hoff + 1) as f32;
+    fn cums(&mut self) -> (f64, f64, f64) {
+        let cum_block_prob_new = self.n_rejected_new as f64 / (self.n_arrivals_new as f64 + 1.0);
+        let cum_block_prob_hoff = self.n_rejected_hoff as f64 / (self.n_arrivals_hoff as f64 + 1.0);
+        let cum_block_prob_tot = (self.n_rejected_new + self.n_rejected_hoff) as f64
+            / (self.n_arrivals_new + self.n_arrivals_hoff + 1) as f64;
         (cum_block_prob_new, cum_block_prob_hoff, cum_block_prob_tot)
     }
 
@@ -78,7 +78,7 @@ impl Stats {
         self.cum_block_probs_hoff.push(cum_block_prob_hoff);
         self.cum_block_probs_tot.push(cum_block_prob_tot);
 
-        let block_prob = self.n_curr_rejected_new as f32 / (self.n_curr_arrivals_new as f32 + 1.0);
+        let block_prob = self.n_curr_rejected_new as f64 / (self.n_curr_arrivals_new as f64 + 1.0);
         self.block_probs.push(block_prob);
         println!(
             "\nBlocking probability events {}-{}: {:.4}, cumulative {:.4}",
@@ -90,8 +90,10 @@ impl Stats {
     }
 
     /// t: Simulation time
-    /// n_in_progress: Calls currently in progress at simulation end
-    pub fn report_end(&mut self, t: f32, n_in_progress: usize) {
+    /// n_in_progress: Number of calls currently in progress at simulation end
+    pub fn report_end(&mut self, t: f64, n_in_progress: usize) {
+        // Count how many calls _should_ currently be in progress, based on the number
+        // of reported incoming and terminated calls
         let delta = self.n_arrivals_new + self.n_arrivals_hoff
             - self.n_rejected_new
             - self.n_rejected_hoff
