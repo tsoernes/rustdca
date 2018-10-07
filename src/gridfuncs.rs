@@ -167,7 +167,7 @@ pub fn get_eligible_chs<S: Data<Elem = bool>>(grid: &Grid<S>, cell: &Cell) -> Ve
 pub fn argpmax1<N: PartialOrd + Copy>(arr: &Array1<N>) -> Option<(usize, N)> {
     arr.indexed_iter()
         .fold(None, |acc, (idx, &elem)| match acc {
-            Some((acc_idx, acc_elem)) if &acc_elem > &elem => Some((acc_idx, acc_elem)),
+            Some((acc_idx, acc_elem)) if acc_elem > elem => Some((acc_idx, acc_elem)),
             _ => Some((idx, elem)),
         })
 }
@@ -198,7 +198,7 @@ pub fn validate_reuse_constraint<S: Data<Elem = bool>>(grid: &Grid<S>) -> Result
     for r in 0..ROWS {
         for c in 0..COLS {
             let cell = Cell { row: r, col: c };
-            // Channels in use at any neighbor within the reuse distance AND the focal cell ('cell')
+            // Channels in use at any neighbor within the reuse distance AND the focal cell 'cell'
             let inuse = inuse_neighs(grid, &cell).bitand(&grid.slice(s![r, c, ..]));
             debug_assert_eq!(inuse.shape(), &[CHANNELS]);
             if inuse.into_iter().any(|&x| x) {
@@ -214,7 +214,7 @@ pub fn validate_reuse_constraint<S: Data<Elem = bool>>(grid: &Grid<S>) -> Result
 
 /// A feature representation (frep for short) of the grid. The frep is of the
 /// same spatial dimension as the grid. For a given cell, the first 'CHANNELS' features
-/// specify how many times each of the channels is in used within a 4-cell radius,
+/// specifies how many times each of the channels is in used within a 4-cell radius,
 /// not including the cell itself. An additional feature counts the number of eligible
 /// channels in that cell.
 pub fn feature_rep<S: Data<Elem = bool>>(grid: &Grid<S>) -> FrepO {

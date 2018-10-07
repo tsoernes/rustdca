@@ -21,7 +21,6 @@ pub trait Agent {
 }
 
 /// (x_t, e_t) -> a_t -> r_{t+1} -> (x_{t+1}, e_{t+1})
-// fn simulate(opt: Opt) -> (f32, f32) {
 pub fn simulate<A: Agent>(opt: &Opt) {
     // Create a CTRL-C key handler
     let running = Arc::new(AtomicBool::new(true));
