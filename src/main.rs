@@ -66,7 +66,7 @@ pub struct Opt {
     #[structopt(long = "log_iter", default_value = "5000")]
     log_iter: i32,
 
-    /// Learning rate
+    /// Learning rate for neural network
     #[structopt(short = "l", long = "alpha", default_value = "2.52e-6")]
     alpha: f32,
 

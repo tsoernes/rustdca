@@ -179,6 +179,18 @@ impl EventGen {
         self.push(new_event)
     }
 
+    /// Generate the departure event of a regular call
+    pub fn event_end(&mut self, t: f64, cell: Cell, ch: usize) -> f64 {
+        let dur = self.call_dur.into();
+        self._event_end(t, dur, cell, ch, None)
+    }
+
+    /// Generate the departure event of a handed-off call
+    pub fn event_hoff_end(&mut self, t: f64, cell: Cell, ch: usize) -> f64 {
+        let dur = self.hoff_call_dur.into();
+        self._event_end(t, dur, cell, ch, None)
+    }
+
     fn _event_end(
         &mut self,
         t: f64,
@@ -199,17 +211,5 @@ impl EventGen {
         };
         self.push(event);
         t + dt
-    }
-
-    /// Generate the departure event of a regular call
-    pub fn event_end(&mut self, t: f64, cell: Cell, ch: usize) -> f64 {
-        let dur = self.call_dur.into();
-        self._event_end(t, dur, cell, ch, None)
-    }
-
-    /// Generate the departure event of a handed-off call
-    pub fn event_hoff_end(&mut self, t: f64, cell: Cell, ch: usize) -> f64 {
-        let dur = self.hoff_call_dur.into();
-        self._event_end(t, dur, cell, ch, None)
     }
 }
