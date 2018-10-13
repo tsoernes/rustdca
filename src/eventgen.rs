@@ -71,9 +71,9 @@ impl Eq for EI {}
 #[derive(Default)]
 pub struct EventGen {
     id: u32,                                      // Current Event ID
-    call_intertime: f32,                          // Average time between call arrivals
-    call_dur: f32,                                // Average call duration
-    hoff_call_dur: f32,                           // Average hand-off call duration
+    call_rate: f32,                               // Call rate, calls per minutes
+    call_dur_inv: f32,                            // (Inverse of) Average call duration, minutes
+    hoff_call_dur_inv: f32, // (Inverse of) Average hand-off call duration, minutes
     event_pq: BinaryHeap<EI>, // Min-heap of event-identifiers sorted on event times
     events: HashMap<u32, Event>, // Mapping from event IDs to event structs
     end_ids: HashMap<(usize, usize, usize), u32>, // Mapping from cell-channel pairs to end event IDs
@@ -81,15 +81,15 @@ pub struct EventGen {
 
 impl EventGen {
     pub fn new(opt: &Opt) -> EventGen {
-        let call_intertime = opt.call_rate_ph / 60.0;
+        let call_rate = opt.call_rate_ph / 60.0;
         debug!(
             "Call intertime: {}, call duration: {}",
-            call_intertime, opt.call_dur
+            call_rate, opt.call_dur
         );
         EventGen {
-            call_intertime: call_intertime,
-            call_dur: 1.0 / opt.call_dur,
-            hoff_call_dur: 1.0 / opt.hoff_call_dur,
+            call_rate: call_rate,
+            call_dur_inv: 1.0 / opt.call_dur,
+            hoff_call_dur_inv: 1.0 / opt.hoff_call_dur,
             ..Default::default()
         }
     }
@@ -139,12 +139,12 @@ impl EventGen {
         let id = self.end_ids
             .remove(&(cell.row, cell.col, from_ch))
             .expect("End ID not found");
-        self.events.get_mut(&id).expect("Event for ID not found").ch = Some(to_ch);
         self.end_ids.insert((cell.row, cell.col, to_ch), id);
+        self.events.get_mut(&id).expect("Event for ID not found").ch = Some(to_ch);
     }
 
     pub fn event_new(&mut self, t: f64, cell: Cell) {
-        let dt = Exp::new(self.call_intertime.into()).sample(&mut thread_rng()) as f64;
+        let dt = Exp::new(self.call_rate.into()).sample(&mut thread_rng()) as f64;
         self.id += 1;
         let event = Event {
             id: self.id,
@@ -165,8 +165,8 @@ impl EventGen {
         let neighs = neighbors(1, cell.row, cell.col, false);
         let neigh_i: usize = Uniform::from(0..neighs.rows()).sample(&mut thread_rng());
         let to_cell = cell_of(neighs, neigh_i);
-        let dur = self.call_dur.into();
-        let end_t = self._event_end(t, dur, cell, ch, Some(to_cell.clone()));
+        let dur_inv = self.call_dur_inv.into();
+        let end_t = self._event_end(t, dur_inv, cell, ch, Some(to_cell.clone()));
         self.id += 1;
         let new_event = Event {
             id: self.id,
@@ -181,25 +181,25 @@ impl EventGen {
 
     /// Generate the departure event of a regular call
     pub fn event_end(&mut self, t: f64, cell: Cell, ch: usize) -> f64 {
-        let dur = self.call_dur.into();
+        let dur = self.call_dur_inv.into();
         self._event_end(t, dur, cell, ch, None)
     }
 
     /// Generate the departure event of a handed-off call
     pub fn event_hoff_end(&mut self, t: f64, cell: Cell, ch: usize) -> f64 {
-        let dur = self.hoff_call_dur.into();
-        self._event_end(t, dur, cell, ch, None)
+        let dur_inv = self.hoff_call_dur_inv.into();
+        self._event_end(t, dur_inv, cell, ch, None)
     }
 
     fn _event_end(
         &mut self,
         t: f64,
-        dur: f64,
+        dur_inv: f64,
         cell: Cell,
         ch: usize,
         to_cell: Option<Cell>,
     ) -> f64 {
-        let dt = Exp::new(dur).sample(&mut thread_rng()) as f64;
+        let dt = Exp::new(dur_inv).sample(&mut thread_rng()) as f64;
         self.id += 1;
         let event = Event {
             id: self.id,

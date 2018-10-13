@@ -59,11 +59,11 @@ pub struct Opt {
     p_hoff: f32,
 
     /// Simulation duration
-    #[structopt(short = "i", long = "n_events", default_value = "10000")]
+    #[structopt(short = "i", long = "n_events", default_value = "100000")]
     n_events: i32,
 
     /// Show blocking probability every 'log_iter' iterations
-    #[structopt(long = "log_iter", default_value = "5000")]
+    #[structopt(long = "log_iter", default_value = "10000")]
     log_iter: i32,
 
     /// Learning rate for neural network
